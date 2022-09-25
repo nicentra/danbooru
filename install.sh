@@ -3,8 +3,8 @@
 # Run: curl -L -s https://raw.githubusercontent.com/danbooru/danbooru/master/INSTALL.debian -o install.sh ; chmod +x install.sh ; ./install.sh
 
 export RUBY_VERSION=3.1.2
-export GITHUB_INSTALL_SCRIPTS=https://raw.githubusercontent.com/danbooru/danbooru/master/script/install
-export VIPS_VERSION=8.7.0
+export GITHUB_INSTALL_SCRIPTS=https://raw.githubusercontent.com/nicentra/danbooru/master/script/install
+export VIPS_VERSION=8.12.1
 
 if [[ "$(whoami)" != "root" ]] ; then
   echo "You must run this script as root"
@@ -45,17 +45,17 @@ fi
 apt-get update
 apt-get -y install apt-transport-https
 apt-get -y install zlib1g-dev libglib2.0-dev
-apt-get -y install $LIBSSL_DEV_PKG build-essential automake libxml2-dev libxslt-dev ncurses-dev sudo libreadline-dev flex bison ragel redis git curl libcurl4-openssl-dev sendmail-bin sendmail nginx ssh coreutils ffmpeg mkvtoolnix
+apt-get -y install $LIBSSL_DEV_PKG build-essential automake libxml2-dev libxslt-dev ncurses-dev sudo libreadline-dev flex bison ragel redis git curl libcurl4-openssl-dev sendmail-bin sendmail nginx ssh coreutils ffmpeg mkvtoolnix libvips42 libvips-dev
 apt-get -y install libpq-dev postgresql-client
 apt-get -y install liblcms2-dev $LIBJPEG_TURBO_DEV_PKG libexpat1-dev libgif-dev libpng-dev libexif-dev
 apt-get -y install gcc g++
 apt-get -y install exiftool perl perl-modules
 
-curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add -
-echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list
-curl -sSL https://deb.nodesource.com/setup_10.x | sudo -E bash -
-apt-get update
-apt-get -y install nodejs yarn
+# curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add -
+# echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list
+# curl -sSL https://deb.nodesource.com/setup_10.x | sudo -E bash -
+# apt-get update
+# apt-get -y install nodejs yarn
 apt-get remove cmdtest
 
 if [ $? -ne 0 ]; then
@@ -64,13 +64,13 @@ if [ $? -ne 0 ]; then
 fi
 
 # compile and install libvips (the version in apt is too old)
-cd /tmp
-wget -q https://github.com/libvips/libvips/releases/download/v$VIPS_VERSION/vips-$VIPS_VERSION.tar.gz
-tar xzf vips-$VIPS_VERSION.tar.gz
-cd vips-$VIPS_VERSION
-./configure --prefix=/usr
-make install
-ldconfig
+# cd /tmp
+# wget -q https://github.com/libvips/libvips/releases/download/v$VIPS_VERSION/vips-$VIPS_VERSION.tar.gz
+# tar xzf vips-$VIPS_VERSION.tar.gz
+# cd vips-$VIPS_VERSION
+# ./configure --prefix=/usr
+# make install
+# ldconfig
 
 # Create user account
 useradd -m danbooru
@@ -78,7 +78,7 @@ chsh -s /bin/bash danbooru
 usermod -G danbooru,sudo danbooru
 
 # Set up Postgres
-export PG_VERSION=`pg_config --version | egrep -o '[0-9]{1,}\.[0-9]{1,}[^-]'`
+export PG_VERSION=`pg_config --version | egrep -o '[0-9]{1,}' | head -1`
 
 # Install rbenv
 echo "* Installing rbenv..."
