@@ -33,12 +33,20 @@ class TagNameValidator < ActiveModel::EachValidator
       record.errors.add(attribute, "'#{value}' cannot begin with a '#{value[0]}'")
     when /_\z/
       record.errors.add(attribute, "'#{value}' cannot end with an underscore")
+    when /＿\z/
+      record.errors.add(attribute, "'#{value}' cannot end with an underscore")
     when /__/
+      record.errors.add(attribute, "'#{value}' cannot contain consecutive underscores")
+    when /_＿/
+      record.errors.add(attribute, "'#{value}' cannot contain consecutive underscores")
+    when /＿_/
+      record.errors.add(attribute, "'#{value}' cannot contain consecutive underscores")
+    when /＿＿/
       record.errors.add(attribute, "'#{value}' cannot contain consecutive underscores")
     when /[^[:graph:]]/
       record.errors.add(attribute, "'#{value}' cannot contain non-printable characters")
-    when /[^[:ascii:]]/
-      record.errors.add(attribute, "'#{value}' must consist of only ASCII characters")
+    when /[^[:ascii:]\p{Han}\p{Katakana}\p{Hiragana}\p{Hangul}\x{FF5F}-\x{FF9F}\x{3000}-\x{303F}\x{2E80}-\x{2FD5}]/
+      record.errors.add(attribute, "'#{value}' must consist of only ASCII or CJK characters")
     when /\A(#{PostQueryBuilder::METATAGS.join("|")}):(.+)\z/i
       record.errors.add(attribute, "'#{value}' cannot begin with '#{$1}:'")
     when /\A(#{Tag.categories.regexp}):(.+)\z/i
