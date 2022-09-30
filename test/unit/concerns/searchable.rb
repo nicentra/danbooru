@@ -105,11 +105,19 @@ class SearchableTest < ActiveSupport::TestCase
       subject { UserSession }
 
       should "work" do
-        @us = create(:user_session, ip_addr: "10.0.0.1")
-        assert_search_equals(@us, ip_addr: "10.0.0.1")
-        assert_search_equals(@us, ip_addr: "10.0.0.1/24")
-        assert_search_equals(@us, ip_addr: "10.0.0.1,1.1.1.1")
-        assert_search_equals(@us, ip_addr: "10.0.0.1 1.1.1.1")
+        @us1 = create(:user_session, ip_addr: "10.0.0.1")
+        @us2 = create(:user_session, ip_addr: "11.0.0.1")
+
+        assert_search_equals(@us1, ip_addr: "10.0.0.1")
+        assert_search_equals(@us1, ip_addr: "10.0.0.1/24")
+        assert_search_equals(@us1, ip_addr: "10.0.0.1,1.1.1.1")
+        assert_search_equals(@us1, ip_addr: "10.0.0.1 1.1.1.1")
+
+        assert_search_equals([@us2, @us1], ip_addr: "10.1.0.0/8,11.1.0.0/8")
+        assert_search_equals([@us2, @us1], ip_addr: "10.1.0.0/8 11.1.0.0/8")
+
+        assert_search_equals([], ip_addr: "10.0.0.x")
+        assert_search_equals([], ip_addr: "10.0.0.x 11.0.0.y")
       end
     end
 
@@ -228,6 +236,9 @@ class SearchableTest < ActiveSupport::TestCase
           assert_search_equals(@mr1, model_type: "Comment", model_id: @mr1.model.id)
           assert_search_equals(@mr2, model_type: "ForumPost", model_id: @mr2.model.id)
           assert_search_equals(@mr3, model_type: "Dmail", model_id: @mr3.model.id)
+
+          assert_search_equals([@mr2, @mr1], model_type_not_eq: "Dmail")
+          assert_search_equals([], model_type: "Dmail", model_id_not_eq: @mr3.model_id)
 
           assert_search_equals(@mr1, Comment: { body: @mr1.model.body })
           assert_search_equals(@mr2, ForumPost: { body: @mr2.model.body })

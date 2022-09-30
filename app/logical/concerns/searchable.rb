@@ -9,6 +9,22 @@ module Searchable
     relation.where(all.where_clause.invert.ast)
   end
 
+  # Combine two relations like `ActiveRecord::Relation#and`, but allow structurally incompatible relations.
+  def and_relation(relation)
+    q = all
+    raise "incompatible FROM clauses: #{q.to_sql}; #{relation.to_sql}" if !q.from_clause.empty? && q.from_clause != relation.from_clause
+    raise "incompatible GROUP BY clauses: #{q.to_sql}; #{relation.to_sql}" if !q.group_values.empty? && q.group_values != relation.group_values
+
+    q = q.select(q.select_values + relation.select_values) if !relation.select_values.empty?
+    q = q.from(relation.from_clause.value) if !relation.from_clause.empty?
+    q = q.joins(relation.joins_values + q.joins_values) if relation.joins_values.present?
+    q = q.where(relation.where_clause.ast) if relation.where_clause.present?
+    q = q.group(relation.group_values) if relation.group_values.present?
+    q = q.order(relation.order_values) if relation.order_values.present? && !relation.reordering_value
+    q = q.reorder(relation.order_values) if relation.order_values.present? && relation.reordering_value
+    q
+  end
+
   # Search a table column by an Arel operator.
   #
   # @see https://github.com/rails/rails/blob/master/activerecord/lib/arel/predications.rb
@@ -71,11 +87,13 @@ module Searchable
 
   def where_inet_matches(attr, value)
     if value.match?(/[, ]/)
-      ips = value.split(/[, ]+/).map { |ip| Danbooru::IpAddress.new(ip).to_string }
-      where("#{qualified_column_for(attr)} = ANY(ARRAY[?]::inet[])", ips)
+      ips = value.split(/[, ]+/).map { |ip| Danbooru::IpAddress.parse(ip).to_s }
+      return none if ips.any?(&:blank?)
+      where("#{qualified_column_for(attr)} <<= ANY(ARRAY[?]::inet[])", ips)
     else
-      ip = Danbooru::IpAddress.new(value)
-      where("#{qualified_column_for(attr)} <<= ?", ip.to_string)
+      ip = Danbooru::IpAddress.parse(value)
+      return none if ip.nil?
+      where("#{qualified_column_for(attr)} <<= ?", ip.to_s)
     end
   end
 
@@ -132,8 +150,18 @@ module Searchable
 
   def where_array_count(attr, value)
     qualified_column = "cardinality(#{qualified_column_for(attr)})"
-    range = PostQueryBuilder.parse_range(value, :integer)
-    where_operator(qualified_column, *range)
+    where_numeric_matches(qualified_column, value)
+  end
+
+  # where_union(A, B, C) is like `WHERE A OR B OR C`, except it may be faster if the conditions are disjoint.
+  # where_union(A, B) does `SELECT * FROM table WHERE id IN (SELECT id FROM table WHERE A UNION ALL SELECT id FROM table WHERE B)`
+  def where_union(*relations, primary_key: :id, foreign_key: :id)
+    arels = relations.map { |relation| relation.select(foreign_key).arel }
+    union = arels.reduce do |left, right|
+      Arel::Nodes::UnionAll.new(left, right)
+    end
+
+    where(arel_table[primary_key].in(union))
   end
 
   # @param attr [String] the name of the JSON field
@@ -172,8 +200,7 @@ module Searchable
 
   # value: "5", ">5", "<5", ">=5", "<=5", "5..10", "5,6,7"
   def where_numeric_matches(attribute, value, type = :integer)
-    range = PostQueryBuilder.parse_range(value, type)
-    where_operator(attribute, *range)
+    attribute_matches(value, attribute, type)
   end
 
   def where_boolean_matches(attribute, value)
@@ -202,19 +229,56 @@ module Searchable
     end
   end
 
+  def attribute_matches(value, field, type = :integer)
+    operator, arg = RangeParser.parse(value, type)
+
+    if operator == :union
+      # operator = :union, arg = [[:eq, 5], [:gt, 7], [:lt, 3]]
+      relation = arg.map do |sub_operator, sub_value|
+        where_operator(field, sub_operator, sub_value)
+      end.reduce(:or)
+    else
+      relation = where_operator(field, operator, arg)
+    end
+
+    # XXX Hack to make negating the equality operator work correctly on nullable columns.
+    #
+    # This makes `Post.attribute_matches(1, :approver_id)` produce `WHERE approver_id = 1 AND approver_id IS NOT NULL`.
+    # This way if the relation is negated with `Post.attribute_matches(1, :approver_id).negate_relation`, it will
+    # produce `WHERE approver_id != 1 OR approver_id IS NULL`. This is so the search includes NULL values; if it
+    # was just `approver_id != 1`, then it would not include when approver_id is NULL.
+    if (operator in :eq | :not_eq) && arg != nil && has_attribute?(field) && column_for_attribute(field).null
+      relation = relation.where.not(field => nil)
+    end
+
+    relation
+  rescue RangeParser::ParseError
+    none
+  end
+
   def search_attributes(params, attributes, current_user:)
     SearchContext.new(all, params, current_user).search_attributes(attributes)
   end
 
+  # Order according to the list of IDs in the given string.
+  #
+  # Post.order_custom("1,2,3") => [post #1, post #2, post #3]
+  def order_custom(string)
+    operator, ids = RangeParser.parse(string, :integer)
+    return none unless operator in :in | :eq
+
+    ids = Array.wrap(ids)
+    in_order_of(:id, ids)
+  rescue RangeParser::ParseError
+    none
+  end
+
   def apply_default_order(params)
     if params[:order] == "custom"
-      parse_ids = PostQueryBuilder.parse_range(params[:id], :integer)
-      if parse_ids[0] == :in
-        return in_order_of(:id, parse_ids[1])
-      end
+      order_custom(params[:id])
+    else
+      default_order
     end
-
-    default_order
   end
 
   def default_order
@@ -451,11 +515,11 @@ module Searchable
       relation = self.relation
 
       if params[name].present?
-        relation = visible(relation, name).where_json_contains(:metadata, params[name])
+        relation = visible(relation, name).where_json_contains(name, params[name])
       end
 
       if params["#{name}_has_key"]
-        relation = visible(relation, name).where_json_has_key(:metadata, params["#{name}_has_key"])
+        relation = visible(relation, name).where_json_has_key(name, params["#{name}_has_key"])
       end
 
       if params["has_#{name}"].to_s.truthy?
@@ -603,13 +667,8 @@ module Searchable
         relation = visible(relation, attr).where(attr => model.visible(current_user).search(params[model_key], current_user))
       end
 
-      if params["#{attr}_id"].present?
-        relation = search_context(relation).search_attribute("#{attr}_id")
-      end
-
-      if params["#{attr}_type"].present? && !model_specified
-        relation = search_context(relation).search_attribute("#{attr}_type")
-      end
+      relation = search_context(relation).search_attribute("#{attr}_id")
+      relation = search_context(relation).search_attribute("#{attr}_type")
 
       relation
     end

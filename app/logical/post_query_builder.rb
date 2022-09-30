@@ -12,8 +12,6 @@ require "strscan"
 class PostQueryBuilder
   extend Memoist
 
-  class ParseError < StandardError; end
-
   # How many tags a `blah*` search should match.
   MAX_WILDCARD_TAGS = 100
 
@@ -257,8 +255,7 @@ class PostQueryBuilder
     end
   end
 
-  def posts(post_query, includes: nil)
-    relation = Post.all
+  def posts(post_query, relation = Post.unscoped, includes: nil)
     relation = add_joins(post_query, relation)
     relation = build_relation(post_query, relation)
 
@@ -269,8 +266,14 @@ class PostQueryBuilder
     elsif post_query.has_metatag?(:date, :age) && post_query.find_metatag(:order).in?(["id_desc", nil])
       relation = search_order(relation, "created_at_desc")
     elsif post_query.find_metatag(:order) == "custom"
-      relation = search_order_custom(relation, post_query.select_metatags(:id).map(&:value))
-    elsif post_query.has_metatag?(:ordfav)
+      ids = post_query.select_metatags(:id).map(&:value)
+
+      if ids.size == 1
+        relation = relation.order_custom(ids.first)
+      else
+        relation = relation.none
+      end
+    elsif post_query.has_metatag?(:ordfav, :ordpool, :ordfavgroup)
       # no-op
     else
       relation = search_order(relation, post_query.find_metatag(:order))
@@ -336,135 +339,135 @@ class PostQueryBuilder
   def search_order(relation, order)
     case order.to_s.downcase
     when "id", "id_asc"
-      relation = relation.order("posts.id ASC")
+      relation = relation.reorder("posts.id ASC")
 
     when "id_desc"
-      relation = relation.order("posts.id DESC")
+      relation = relation.reorder("posts.id DESC")
 
     when "md5", "md5_desc"
-      relation = relation.order("posts.md5 DESC")
+      relation = relation.reorder("posts.md5 DESC")
 
     when "md5_asc"
-      relation = relation.order("posts.md5 ASC")
+      relation = relation.reorder("posts.md5 ASC")
 
     when "score", "score_desc"
-      relation = relation.order("posts.score DESC, posts.id DESC")
+      relation = relation.reorder("posts.score DESC, posts.id DESC")
 
     when "score_asc"
-      relation = relation.order("posts.score ASC, posts.id ASC")
+      relation = relation.reorder("posts.score ASC, posts.id ASC")
 
     when "upvotes", "upvotes_desc"
-      relation = relation.order("posts.up_score DESC, posts.id DESC")
+      relation = relation.reorder("posts.up_score DESC, posts.id DESC")
 
     when "upvotes_asc"
-      relation = relation.order("posts.up_score ASC, posts.id ASC")
+      relation = relation.reorder("posts.up_score ASC, posts.id ASC")
 
     # XXX down_score is negative so order:downvotes sorts lowest-to-highest so that most downvoted is first.
     when "downvotes", "downvotes_desc"
-      relation = relation.order("posts.down_score ASC, posts.id ASC")
+      relation = relation.reorder("posts.down_score ASC, posts.id ASC")
 
     when "downvotes_asc"
-      relation = relation.order("posts.down_score DESC, posts.id DESC")
+      relation = relation.reorder("posts.down_score DESC, posts.id DESC")
 
     when "favcount"
-      relation = relation.order("posts.fav_count DESC, posts.id DESC")
+      relation = relation.reorder("posts.fav_count DESC, posts.id DESC")
 
     when "favcount_asc"
-      relation = relation.order("posts.fav_count ASC, posts.id ASC")
+      relation = relation.reorder("posts.fav_count ASC, posts.id ASC")
 
     when "created_at", "created_at_desc"
-      relation = relation.order("posts.created_at DESC")
+      relation = relation.reorder("posts.created_at DESC")
 
     when "created_at_asc"
-      relation = relation.order("posts.created_at ASC")
+      relation = relation.reorder("posts.created_at ASC")
 
     when "change", "change_desc"
-      relation = relation.order("posts.updated_at DESC, posts.id DESC")
+      relation = relation.reorder("posts.updated_at DESC, posts.id DESC")
 
     when "change_asc"
-      relation = relation.order("posts.updated_at ASC, posts.id ASC")
+      relation = relation.reorder("posts.updated_at ASC, posts.id ASC")
 
     when "comment", "comm"
-      relation = relation.order("posts.last_commented_at DESC NULLS LAST, posts.id DESC")
+      relation = relation.reorder("posts.last_commented_at DESC NULLS LAST, posts.id DESC")
 
     when "comment_asc", "comm_asc"
-      relation = relation.order("posts.last_commented_at ASC NULLS LAST, posts.id ASC")
+      relation = relation.reorder("posts.last_commented_at ASC NULLS LAST, posts.id ASC")
 
     when "comment_bumped"
-      relation = relation.order("posts.last_comment_bumped_at DESC NULLS LAST")
+      relation = relation.reorder("posts.last_comment_bumped_at DESC NULLS LAST")
 
     when "comment_bumped_asc"
-      relation = relation.order("posts.last_comment_bumped_at ASC NULLS FIRST")
+      relation = relation.reorder("posts.last_comment_bumped_at ASC NULLS FIRST")
 
     when "note"
-      relation = relation.order("posts.last_noted_at DESC NULLS LAST")
+      relation = relation.reorder("posts.last_noted_at DESC NULLS LAST")
 
     when "note_asc"
-      relation = relation.order("posts.last_noted_at ASC NULLS FIRST")
+      relation = relation.reorder("posts.last_noted_at ASC NULLS FIRST")
 
     when "artcomm"
       relation = relation.joins("INNER JOIN artist_commentaries ON artist_commentaries.post_id = posts.id")
-      relation = relation.order("artist_commentaries.updated_at DESC")
+      relation = relation.reorder("artist_commentaries.updated_at DESC")
 
     when "artcomm_asc"
       relation = relation.joins("INNER JOIN artist_commentaries ON artist_commentaries.post_id = posts.id")
-      relation = relation.order("artist_commentaries.updated_at ASC")
+      relation = relation.reorder("artist_commentaries.updated_at ASC")
 
     when "mpixels", "mpixels_desc"
       relation = relation.where(Arel.sql("posts.image_width is not null and posts.image_height is not null"))
       # Use "w*h/1000000", even though "w*h" would give the same result, so this can use
       # the posts_mpixels index.
-      relation = relation.order(Arel.sql("posts.image_width * posts.image_height / 1000000.0 DESC"))
+      relation = relation.reorder(Arel.sql("posts.image_width * posts.image_height / 1000000.0 DESC"))
 
     when "mpixels_asc"
       relation = relation.where("posts.image_width is not null and posts.image_height is not null")
-      relation = relation.order(Arel.sql("posts.image_width * posts.image_height / 1000000.0 ASC"))
+      relation = relation.reorder(Arel.sql("posts.image_width * posts.image_height / 1000000.0 ASC"))
 
     when "portrait"
       relation = relation.where("posts.image_width IS NOT NULL and posts.image_height IS NOT NULL")
-      relation = relation.order(Arel.sql("1.0 * posts.image_width / GREATEST(1, posts.image_height) ASC"))
+      relation = relation.reorder(Arel.sql("1.0 * posts.image_width / GREATEST(1, posts.image_height) ASC"))
 
     when "landscape"
       relation = relation.where("posts.image_width IS NOT NULL and posts.image_height IS NOT NULL")
-      relation = relation.order(Arel.sql("1.0 * posts.image_width / GREATEST(1, posts.image_height) DESC"))
+      relation = relation.reorder(Arel.sql("1.0 * posts.image_width / GREATEST(1, posts.image_height) DESC"))
 
     when "filesize", "filesize_desc"
-      relation = relation.order("posts.file_size DESC")
+      relation = relation.reorder("posts.file_size DESC")
 
     when "filesize_asc"
-      relation = relation.order("posts.file_size ASC")
+      relation = relation.reorder("posts.file_size ASC")
 
     when /\A(?<column>#{COUNT_METATAGS.join("|")})(_(?<direction>asc|desc))?\z/i
       column = $~[:column]
       direction = $~[:direction] || "desc"
-      relation = relation.order(column => direction, :id => direction)
+      relation = relation.reorder(column => direction, :id => direction)
 
     when "tagcount", "tagcount_desc"
-      relation = relation.order("posts.tag_count DESC")
+      relation = relation.reorder("posts.tag_count DESC")
 
     when "tagcount_asc"
-      relation = relation.order("posts.tag_count ASC")
+      relation = relation.reorder("posts.tag_count ASC")
 
     when "duration", "duration_desc"
-      relation = relation.joins(:media_asset).order("media_assets.duration DESC NULLS LAST, posts.id DESC")
+      relation = relation.joins(:media_asset).reorder("media_assets.duration DESC NULLS LAST, posts.id DESC")
 
     when "duration_asc"
-      relation = relation.joins(:media_asset).order("media_assets.duration ASC NULLS LAST, posts.id ASC")
+      relation = relation.joins(:media_asset).reorder("media_assets.duration ASC NULLS LAST, posts.id ASC")
 
     # artags_desc, copytags_desc, chartags_desc, gentags_desc, metatags_desc
     when /(#{TagCategory.short_name_list.join("|")})tags(?:\Z|_desc)/
-      relation = relation.order("posts.tag_count_#{TagCategory.short_name_mapping[$1]} DESC")
+      relation = relation.reorder("posts.tag_count_#{TagCategory.short_name_mapping[$1]} DESC")
 
     # artags_asc, copytags_asc, chartags_asc, gentags_asc, metatags_asc
     when /(#{TagCategory.short_name_list.join("|")})tags_asc/
-      relation = relation.order("posts.tag_count_#{TagCategory.short_name_mapping[$1]} ASC")
+      relation = relation.reorder("posts.tag_count_#{TagCategory.short_name_mapping[$1]} ASC")
 
     when "random"
-      relation = relation.order("random()")
+      relation = relation.reorder("random()")
 
     when "rank"
       relation = relation.where("posts.score > 0 and posts.created_at >= ?", 2.days.ago)
-      relation = relation.order(Arel.sql("log(3, posts.score) + (extract(epoch from posts.created_at) - extract(epoch from timestamp '2005-05-24')) / 35000 DESC"))
+      relation = relation.reorder(Arel.sql("log(3, posts.score) + (extract(epoch from posts.created_at) - extract(epoch from timestamp '2005-05-24')) / 35000 DESC"))
 
     when "curated"
       contributors = User.bit_prefs_match(:can_upload_free, true)
@@ -474,158 +477,21 @@ class PostQueryBuilder
         .where(favorites: { user: contributors })
         .group("posts.id")
         .select("posts.*, COUNT(*) AS contributor_fav_count")
-        .order("contributor_fav_count DESC, posts.fav_count DESC, posts.id DESC")
+        .reorder("contributor_fav_count DESC, posts.fav_count DESC, posts.id DESC")
 
     when "modqueue", "modqueue_desc"
-      relation = relation.with_queued_at.order("queued_at DESC, posts.id DESC")
+      relation = relation.with_queued_at.reorder("queued_at DESC, posts.id DESC")
 
     when "modqueue_asc"
-      relation = relation.with_queued_at.order("queued_at ASC, posts.id ASC")
+      relation = relation.with_queued_at.reorder("queued_at ASC, posts.id ASC")
 
     when "none"
       relation = relation.reorder(nil)
 
     else
-      relation = relation.order("posts.id DESC")
+      relation = relation.reorder("posts.id DESC")
     end
 
     relation
-  end
-
-  def search_order_custom(relation, id_metatags)
-    return relation.none unless id_metatags.present? && id_metatags.size == 1
-
-    operator, ids = PostQueryBuilder.parse_range(id_metatags.first, :integer)
-    return relation.none unless operator == :in
-
-    relation.in_order_of(:id, ids)
-  end
-
-  concerning :ParseMethods do
-    class_methods do
-      # Parse a simple string value into a Ruby type.
-      # @param string [String] the value to parse
-      # @param type [Symbol] the value's type
-      # @return [Object] the parsed value
-      def parse_cast(string, type)
-        case type
-        when :enum
-          string.downcase
-
-        when :integer
-          Integer(string) # raises ArgumentError if string is invalid
-
-        when :float
-          Float(string) # raises ArgumentError if string is invalid
-
-        when :md5
-          raise ParseError, "#{string} is not a valid MD5" unless string.match?(/\A[0-9a-fA-F]{32}\z/)
-          string.downcase
-
-        when :date, :datetime
-          date = Time.zone.parse(string)
-          raise ParseError, "#{string} is not a valid date" if date.nil?
-          date
-
-        when :age
-          DurationParser.parse(string).ago
-
-        when :interval
-          DurationParser.parse(string)
-
-        when :ratio
-          string = string.tr(":", "/") # "2:3" => "2/3"
-          Rational(string).to_f.round(2) # raises ArgumentError or ZeroDivisionError if string is invalid
-
-        when :filesize
-          raise ParseError, "#{string} is not a valid filesize" unless string =~ /\A(\d+(?:\.\d*)?|\d*\.\d+)([kKmM]?)[bB]?\Z/
-
-          size = Float($1)
-          unit = $2
-
-          conversion_factor = case unit
-          when /m/i
-            1024 * 1024
-          when /k/i
-            1024
-          else
-            1
-          end
-
-          (size * conversion_factor).to_i
-
-        else
-          raise NotImplementedError, "unrecognized type #{type} for #{string}"
-        end
-
-      rescue ArgumentError, ZeroDivisionError => e
-        raise ParseError, e.message
-      end
-
-      def parse_metatag_value(string, type)
-        if type == :enum
-          [:in, string.split(/[, ]+/).map { |x| parse_cast(x, type) }]
-        else
-          parse_range(string, type)
-        end
-      end
-
-      # Parse a metatag range value of the given type. For example: 1..10.
-      # @param string [String] the metatag value
-      # @param type [Symbol] the value's type
-      def parse_range(string, type)
-        range = case string
-        when /\A(.+?)\.\.\.(.+)/ # A...B
-          lo, hi = [parse_cast($1, type), parse_cast($2, type)].sort
-          [:between, (lo...hi)]
-        when /\A(.+?)\.\.(.+)/
-          lo, hi = [parse_cast($1, type), parse_cast($2, type)].sort
-          [:between, (lo..hi)]
-        when /\A<=(.+)/, /\A\.\.(.+)/
-          [:lteq, parse_cast($1, type)]
-        when /\A<(.+)/
-          [:lt, parse_cast($1, type)]
-        when /\A>=(.+)/, /\A(.+)\.\.\Z/
-          [:gteq, parse_cast($1, type)]
-        when /\A>(.+)/
-          [:gt, parse_cast($1, type)]
-        when /[, ]/
-          [:in, string.split(/[, ]+/).map {|x| parse_cast(x, type)}]
-        when "any"
-          [:not_eq, nil]
-        when "none"
-          [:eq, nil]
-        else
-          # add a 5% tolerance for float and filesize values
-          if type == :float || (type == :filesize && string =~ /[km]b?\z/i)
-            value = parse_cast(string, type)
-            [:between, (value * 0.95..value * 1.05)]
-          elsif type.in?([:date, :age])
-            value = parse_cast(string, type)
-            [:between, (value.beginning_of_day..value.end_of_day)]
-          else
-            [:eq, parse_cast(string, type)]
-          end
-        end
-
-        range = reverse_range(range) if type == :age
-        range
-      end
-
-      def reverse_range(range)
-        case range
-        in [:lteq, value]
-          [:gteq, value]
-        in [:lt, value]
-          [:gt, value]
-        in [:gteq, value]
-          [:lteq, value]
-        in [:gt, value]
-          [:lt, value]
-        else
-          range
-        end
-      end
-    end
   end
 end

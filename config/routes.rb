@@ -49,7 +49,7 @@ Rails.application.routes.draw do
   namespace :maintenance do
     namespace :user do
       resource :count_fixes, only: [:new, :create]
-      resource :email_notification, :only => [:show, :destroy]
+      resource :email_notification, only: [:show, :create, :destroy]
       resource :deletion, :only => [:show, :destroy]
     end
   end
@@ -137,7 +137,7 @@ Rails.application.routes.draw do
     end
   end
   resources :forum_topic_visits, only: [:index]
-  resources :ip_bans, only: [:index, :new, :create, :update]
+  resources :ip_bans, only: [:index, :show, :new, :create, :update]
   resources :ip_addresses, only: [:show], id: /.+?(?=\.json|\.xml|\.html)|.+/
   resources :ip_geolocations, only: [:index]
   resource :iqdb_queries, :only => [:show, :create] do

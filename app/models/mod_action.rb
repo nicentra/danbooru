@@ -67,19 +67,17 @@ class ModAction < ApplicationRecord
     ip_ban_delete: 162,
     ip_ban_undelete: 163,
     mass_update: 1000, # XXX unused
-    bulk_revert: 1001, # XXX unused
-    other: 2000,
   }
 
   def self.model_types
-    %w[Artist Comment CommentVote ForumPost ForumTopic IpBan ModerationReport Pool Post PostVote Tag TagAlias TagImplication User UserFeedback]
+    %w[Artist Comment CommentVote ForumPost ForumTopic IpBan ModerationReport Pool Post PostVote Tag TagAlias TagImplication User]
   end
 
   def self.visible(user)
     if user.is_moderator?
       all
     else
-      where.not(category: [:ip_ban_create, :ip_ban_delete])
+      where.not(category: [:ip_ban_create, :ip_ban_delete, :ip_ban_undelete, :moderation_report_handled, :moderation_report_rejected])
     end
   end
 

@@ -80,8 +80,8 @@ class Post < ApplicationRecord
   scope :banned, -> { where(is_banned: true) }
   # XXX conflict with deletable
   scope :active, -> { where(is_pending: false, is_deleted: false, is_flagged: false).where.not(id: PostAppeal.pending) }
-  scope :appealed, -> { deleted.where(id: PostAppeal.pending.select(:post_id)) }
-  scope :in_modqueue, -> { pending.or(flagged).or(appealed) }
+  scope :appealed, -> { where(id: PostAppeal.pending.select(:post_id)) }
+  scope :in_modqueue, -> { where_union(pending, flagged, appealed) }
   scope :expired, -> { pending.where("posts.created_at < ?", Danbooru.config.moderation_period.ago) }
 
   scope :unflagged, -> { where(is_flagged: false) }
@@ -1049,23 +1049,13 @@ class Post < ApplicationRecord
       end
 
       def available_for_moderation(user, hidden: false)
-        return none if user.is_anonymous?
-
-        approved_posts = user.post_approvals.select(:post_id)
         disapproved_posts = user.post_disapprovals.select(:post_id)
 
         if hidden.present?
-          where("posts.uploader_id = ? OR posts.id IN (#{approved_posts.to_sql}) OR posts.id IN (#{disapproved_posts.to_sql})", user.id)
+          in_modqueue.where(id: disapproved_posts)
         else
-          where.not(uploader: user).where.not(id: approved_posts).where.not(id: disapproved_posts)
+          in_modqueue.where.not(id: disapproved_posts)
         end
-      end
-
-      def attribute_matches(value, field, type = :integer)
-        operator, *args = PostQueryBuilder.parse_metatag_value(value, type)
-        where_operator(field, operator, *args)
-      rescue PostQueryBuilder::ParseError
-        none
       end
 
       def is_matches(value, current_user = User.anonymous)
@@ -1131,7 +1121,7 @@ class Post < ApplicationRecord
         when "active"
           active
         when "unmoderated"
-          in_modqueue.available_for_moderation(current_user, hidden: false)
+          available_for_moderation(current_user, hidden: false)
         when "all", "any"
           where("TRUE")
         else
@@ -1148,7 +1138,8 @@ class Post < ApplicationRecord
         when "pending", "flagged", "appealed", "modqueue", "deleted", "banned", "active", "unmoderated"
           where.not(parent: nil).where(parent: status_matches(parent))
         when /\A\d+\z/
-          where(id: parent).or(where(parent: parent))
+          # XXX must use `attribute_matches(parent, :parent_id)` instead of `where(parent_id: parent)` so that `-parent:1` works
+          where(id: parent).or(attribute_matches(parent, :parent_id))
         else
           none
         end
@@ -1348,7 +1339,9 @@ class Post < ApplicationRecord
         else
           user = User.find_by_name(username)
           return none if user.nil?
-          where(approver: user)
+
+          # XXX must use `attribute_matches(user.id, :approver_id)` instead of `where(approver: user)` so that `-approver:evazion` works
+          attribute_matches(user.id, :approver_id)
         end
       end
 
@@ -1397,7 +1390,8 @@ class Post < ApplicationRecord
       def user_tag_match(query, user = CurrentUser.user, tag_limit: user.tag_query_limit, safe_mode: CurrentUser.safe_mode?)
         post_query = PostQuery.normalize(query, current_user: user, tag_limit: tag_limit, safe_mode: safe_mode)
         post_query.validate_tag_limit!
-        post_query.with_implicit_metatags.posts
+        posts = post_query.with_implicit_metatags.posts
+        and_relation(posts)
       end
 
       def search(params, current_user)
@@ -1415,7 +1409,7 @@ class Post < ApplicationRecord
         )
 
         if params[:tags].present?
-          q = q.user_tag_match(params[:tags])
+          q = q.where(id: user_tag_match(params[:tags], current_user).select(:id))
         end
 
         if params[:order].present?
