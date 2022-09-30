@@ -33,6 +33,10 @@ services:
       - DANBOORU_REDIS_URL=redis://redis:6379
       - DANBOORU_IQDB_URL=http://iqdb:5588
       - DANBOORU_CANONICAL_URL=http://localhost:3000
+      - DANBOORU_MAX_FILE_SIZE=500m
+      - DANBOORU_MAX_VIDEO_DURATION=3600
+      - DANBOORU_TWITTER_API_KEY=t995oVhogGi0cx3xhnVC8NnIv
+      - DANBOORU_TWITTER_API_SECRET=6auDfB9Y8eB7w07hTv7omrfJRsaQfYhb8L1ETbXkKEqMY5GiDf
     volumes:
       - "danbooru-images:/danbooru/public/data"
     tmpfs:
@@ -50,6 +54,10 @@ services:
       - DANBOORU_REDIS_URL=redis://redis:6379
       - DANBOORU_IQDB_URL=http://iqdb:5588
       - DANBOORU_CANONICAL_URL=http://localhost
+      - DANBOORU_MAX_FILE_SIZE=500m
+      - DANBOORU_MAX_VIDEO_DURATION=3600
+      - DANBOORU_TWITTER_API_KEY=t995oVhogGi0cx3xhnVC8NnIv
+      - DANBOORU_TWITTER_API_SECRET=6auDfB9Y8eB7w07hTv7omrfJRsaQfYhb8L1ETbXkKEqMY5GiDf
     depends_on:
       - danbooru
     volumes:
@@ -66,6 +74,10 @@ services:
       - DANBOORU_REDIS_URL=redis://redis:6379
       - DANBOORU_IQDB_URL=http://iqdb:5588
       - DANBOORU_CANONICAL_URL=http://localhost
+      - DANBOORU_MAX_FILE_SIZE=500000000
+      - DANBOORU_MAX_VIDEO_DURATION=3600
+      - DANBOORU_TWITTER_API_KEY=t995oVhogGi0cx3xhnVC8NnIv
+      - DANBOORU_TWITTER_API_SECRET=6auDfB9Y8eB7w07hTv7omrfJRsaQfYhb8L1ETbXkKEqMY5GiDf
     depends_on:
       - danbooru
     volumes:

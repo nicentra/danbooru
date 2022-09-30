@@ -45,7 +45,7 @@ class TagNameValidator < ActiveModel::EachValidator
       record.errors.add(attribute, "'#{value}' cannot contain consecutive underscores")
     when /[^[:graph:]]/
       record.errors.add(attribute, "'#{value}' cannot contain non-printable characters")
-    when /[^[:ascii:]\p{Han}\p{Katakana}\p{Hiragana}\p{Hangul}\x{FF5F}-\x{FF9F}\x{3000}-\x{303F}\x{2E80}-\x{2FD5}]/
+    when /[^[:ascii:]\p{Han}\p{Katakana}\p{Hiragana}\p{Hangul}\uFF5F-\u{FF9F}\u{3000}-\u{303F}\u{2E80}-\u{2FD5}]/
       record.errors.add(attribute, "'#{value}' must consist of only ASCII or CJK characters")
     when /\A(#{PostQueryBuilder::METATAGS.join("|")}):(.+)\z/i
       record.errors.add(attribute, "'#{value}' cannot begin with '#{$1}:'")

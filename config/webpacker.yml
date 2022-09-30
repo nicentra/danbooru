@@ -69,7 +69,7 @@ development:
     # Inline should be set to true if using HMR; it inserts a script to take care of live reloading
     inline: true
     # Should we show a full-screen overlay in the browser when there are compiler errors or warnings?
-    overlay: true
+    overlay: false
     # Should we use gzip compression?
     compress: true
     # Note that apps that do not check the host are vulnerable to DNS rebinding attacks

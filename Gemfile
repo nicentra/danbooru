@@ -26,6 +26,7 @@ gem 'webpacker', '= 6.0.0.rc.6'
 gem 'rake'
 gem 'redis'
 gem 'builder'
+gem 'rack-cors'
 # gem 'did_you_mean' # github.com/yuki24/did_you_mean/issues/117
 gem 'puma'
 gem 'scenic'

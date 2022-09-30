@@ -19,8 +19,8 @@ ARG NODE_VERSION=14.15.5
 RUN \
   apt-get update && \
   DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    build-essential libpq-dev libvips-dev zlib1g-dev \
-    curl ca-certificates dirmngr git gpg && \
+  build-essential libpq-dev libvips-dev zlib1g-dev \
+  curl ca-certificates dirmngr git gpg && \
   rm -rf /var/lib/apt/lists/*
 
 RUN \
@@ -42,7 +42,7 @@ RUN yarn install
 
 COPY postcss.config.js Rakefile ./
 COPY bin/rails bin/webpack ./bin/
-COPY config/application.rb config/boot.rb config/danbooru_default_config.rb config/webpacker.yml ./config/
+COPY config/application.rb config/boot.rb config/danbooru_default_config.rb config/danbooru_local_config.rb config/webpacker.yml ./config/
 COPY config/webpack/ ./config/webpack/
 COPY public/images ./public/images
 COPY public/fonts ./public/fonts
@@ -52,8 +52,8 @@ COPY app/javascript/ ./app/javascript/
 RUN \
   bin/rails assets:precompile && \
   rm -rf \
-    node_modules .yarn/cache tmp /usr/local/share/.cache/yarn \
-    /root/.yarn/berry/cache /root/.bundle/cache /root/.npm && \
+  node_modules .yarn/cache tmp /usr/local/share/.cache/yarn \
+  /root/.yarn/berry/cache /root/.bundle/cache /root/.npm && \
   ln -s /tmp tmp && \
   ln -s packs public/packs-test
 
