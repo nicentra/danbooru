@@ -76,4 +76,4 @@ ENTRYPOINT ["tini", "--"]
 CMD ["bin/rails", "server"]
 
 # https://github.com/opencontainers/image-spec/blob/main/annotations.md
-LABEL org.opencontainers.image.source https://github.com/danbooru/danbooru
+LABEL org.opencontainers.image.source https://github.com/nicentra/danbooru
