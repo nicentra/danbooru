@@ -47,20 +47,20 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ github.token }}
 
-      - name: Login to DockerHub
-        uses: docker/login-action@v1
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      # - name: Login to DockerHub
+      #   uses: docker/login-action@v1
+      #   with:
+      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
+      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       # Generate Docker tags from Git tags.
+      # docker.io/nicentra/danbooru
       # https://github.com/docker/metadata-action
       - name: Generate Docker tags
         uses: docker/metadata-action@v3
         id: metadata
         with:
           images: |
-            docker.io/nicentra/danbooru
             ghcr.io/nicentra/danbooru
           tags: |
             type=sha,format=long,prefix=
