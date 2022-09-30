@@ -22,7 +22,8 @@ version: "3.4"
 services:
   danbooru:
     user: root
-    image: ghcr.io/danbooru/danbooru:production
+    # image: ghcr.io/danbooru/danbooru:production
+    build: .
     ports:
       - "3000:3000"
     environment:
@@ -33,10 +34,6 @@ services:
       - DANBOORU_REDIS_URL=redis://redis:6379
       - DANBOORU_IQDB_URL=http://iqdb:5588
       - DANBOORU_CANONICAL_URL=http://localhost:3000
-      - DANBOORU_MAX_FILE_SIZE=500m
-      - DANBOORU_MAX_VIDEO_DURATION=3600
-      - DANBOORU_TWITTER_API_KEY=t995oVhogGi0cx3xhnVC8NnIv
-      - DANBOORU_TWITTER_API_SECRET=6auDfB9Y8eB7w07hTv7omrfJRsaQfYhb8L1ETbXkKEqMY5GiDf
     volumes:
       - "danbooru-images:/danbooru/public/data"
     tmpfs:
@@ -47,17 +44,14 @@ services:
 
   cron:
     user: root
-    image: ghcr.io/danbooru/danbooru:production
+    # image: ghcr.io/danbooru/danbooru:production
+    build: .
     environment:
       - RAILS_ENV=production
       - DATABASE_URL=postgresql://danbooru@postgres/danbooru
       - DANBOORU_REDIS_URL=redis://redis:6379
       - DANBOORU_IQDB_URL=http://iqdb:5588
       - DANBOORU_CANONICAL_URL=http://localhost
-      - DANBOORU_MAX_FILE_SIZE=500m
-      - DANBOORU_MAX_VIDEO_DURATION=3600
-      - DANBOORU_TWITTER_API_KEY=t995oVhogGi0cx3xhnVC8NnIv
-      - DANBOORU_TWITTER_API_SECRET=6auDfB9Y8eB7w07hTv7omrfJRsaQfYhb8L1ETbXkKEqMY5GiDf
     depends_on:
       - danbooru
     volumes:
@@ -67,17 +61,14 @@ services:
   jobs:
     # We need root to write temp upload files in the images directory (/danbooru/public/data)
     user: root
-    image: ghcr.io/danbooru/danbooru:production
+    # image: ghcr.io/danbooru/danbooru:production
+    build: .
     environment:
       - RAILS_ENV=production
       - DATABASE_URL=postgresql://danbooru@postgres/danbooru
       - DANBOORU_REDIS_URL=redis://redis:6379
       - DANBOORU_IQDB_URL=http://iqdb:5588
       - DANBOORU_CANONICAL_URL=http://localhost
-      - DANBOORU_MAX_FILE_SIZE=500000000
-      - DANBOORU_MAX_VIDEO_DURATION=3600
-      - DANBOORU_TWITTER_API_KEY=t995oVhogGi0cx3xhnVC8NnIv
-      - DANBOORU_TWITTER_API_SECRET=6auDfB9Y8eB7w07hTv7omrfJRsaQfYhb8L1ETbXkKEqMY5GiDf
     depends_on:
       - danbooru
     volumes:
