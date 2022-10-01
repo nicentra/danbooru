@@ -1,4 +1,4 @@
-[![codecov](https://codecov.io/gh/danbooru/danbooru/branch/master/graph/badge.svg)](https://codecov.io/gh/danbooru/danbooru) [![Discord](https://img.shields.io/discord/310432830138089472?label=Discord)](https://discord.gg/eSVKkUF)
+[![Discord](https://img.shields.io/discord/805711624076787752?color=blueviolet&label=Discord&logo=discord&style=flate-square)](https://discord.gg/NDcz8YGkGn)
 
 ## Quickstart
 
