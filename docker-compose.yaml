@@ -27,19 +27,23 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - RAILS_ENV=production
+      # - RAILS_ENV=production
       - RAILS_SERVE_STATIC_FILES=true
       - PUMA_WORKERS=1
       - DATABASE_URL=postgresql://danbooru@postgres/danbooru
       - DANBOORU_REDIS_URL=redis://redis:6379
       - DANBOORU_IQDB_URL=http://iqdb:5588
-      - DANBOORU_CANONICAL_URL=http://localhost:3000
+      - DANBOORU_AUTOTAGGER_URL=http://autotagger:5000
+      - DANBOORU_HOSTNAME=nbooru.dai
+      - DANBOORU_CANONICAL_URL=http://nbooru.dai
     volumes:
       - "danbooru-images:/danbooru/public/data"
     tmpfs:
       - /tmp
     depends_on:
       - postgres
+      - iqdb
+      - autotagger
     command: ["bash", "-c", "bin/rails db:prepare && bin/rails db:seed && bin/rails server -b 0.0.0.0"]
 
   cron:
@@ -47,16 +51,18 @@ services:
     # image: ghcr.io/danbooru/danbooru:production
     build: .
     environment:
-      - RAILS_ENV=production
+      # - RAILS_ENV=production
       - DATABASE_URL=postgresql://danbooru@postgres/danbooru
       - DANBOORU_REDIS_URL=redis://redis:6379
       - DANBOORU_IQDB_URL=http://iqdb:5588
-      - DANBOORU_CANONICAL_URL=http://localhost
+      - DANBOORU_AUTOTAGGER_URL=http://autotagger:5000
+      - DANBOORU_HOSTNAME=nbooru.dai
+      - DANBOORU_CANONICAL_URL=http://nbooru.dai
     depends_on:
       - danbooru
     volumes:
       - "danbooru-images:/danbooru/public/data"
-    command: ["bash", "-c", "bin/wait-for-http http://danbooru:3000 5s && bin/rails danbooru:cron"]
+    command: ["bash", "-c", "bin/wait-for-http http://nbooru.dai:3000 5s && bin/rails danbooru:cron"]
 
   jobs:
     # We need root to write temp upload files in the images directory (/danbooru/public/data)
@@ -64,31 +70,38 @@ services:
     # image: ghcr.io/danbooru/danbooru:production
     build: .
     environment:
-      - RAILS_ENV=production
+      # - RAILS_ENV=production
       - DATABASE_URL=postgresql://danbooru@postgres/danbooru
       - DANBOORU_REDIS_URL=redis://redis:6379
       - DANBOORU_IQDB_URL=http://iqdb:5588
-      - DANBOORU_CANONICAL_URL=http://localhost
+      - DANBOORU_AUTOTAGGER_URL=http://autotagger:5000
+      - DANBOORU_HOSTNAME=nbooru.dai
+      - DANBOORU_CANONICAL_URL=http://nbooru.dai
     depends_on:
       - danbooru
     volumes:
       # We need access to images so we can add/remove images to IQDB.
       - "danbooru-images:/danbooru/public/data"
-    command: ["bash", "-c", "bin/wait-for-http http://danbooru:3000 5s && bin/good_job start"]
+    command: ["bash", "-c", "bin/wait-for-http http://nbooru.dai:3000 5s && bin/good_job start"]
 
   # https://github.com/danbooru/iqdb
   # https://hub.docker.com/repository/docker/evazion/iqdb
   iqdb:
-    image: evazion/iqdb
+    image: ghcr.io/danbooru/iqdb/iqdb:latest
     volumes:
       - "iqdb-data:/iqdb/data"
-    command: ["http", "0.0.0.0", "5588", "/iqdb/data/iqdb.sqlite"]
+    command: ["listen", "0.0.0.0:5588", "/iqdb/data/iqdb.sqlite"]
+
+  autotagger:
+    image: ghcr.io/danbooru/autotagger:latest
+    ports:
+      - "5000:5000"
 
   redis:
     image: redis
 
   postgres:
-    image: evazion/postgres
+    image: ghcr.io/danbooru/postgres:14.1
     environment:
       POSTGRES_USER: danbooru
       POSTGRES_HOST_AUTH_METHOD: trust

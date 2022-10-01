@@ -33,8 +33,13 @@ class TwitterApiClient
   # @param cache [Integer] the number of seconds to cache the response
   # @return [Object] the tweet
   # @see https://developer.twitter.com/en/docs/twitter-api/v1/tweets/post-and-engage/api-reference/get-statuses-show-id
+  # def status(id, cache: 1.minute)
+  #   response = client.cache(cache).get("https://api.twitter.com/1.1/statuses/show.json?id=#{id}&tweet_mode=extended")
+  #   response.parse.with_indifferent_access
+  # end
+
   def status(id, cache: 1.minute)
-    response = client.cache(cache).get("https://api.twitter.com/1.1/statuses/show.json?id=#{id}&tweet_mode=extended")
+    response = client.cache(cache).get("https://api.twitter.com/2/tweets/#{id}?expansions=attachments.media_keys&media.fields=duration_ms,height,media_key,preview_image_url,public_metrics,type,url,width,alt_text")
     response.parse.with_indifferent_access
   end
 
