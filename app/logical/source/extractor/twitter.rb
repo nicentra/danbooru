@@ -32,13 +32,13 @@ class Source::Extractor
       if parsed_url.image_url?
         [parsed_url.full_image_url]
       elsif api_response.present?
-        api_response.dig(:extended_entities, :media).to_a.map do |media|
+        api_response.dig(:includes, :media).to_a.map do |media|
           if media[:type] == "photo"
-            media[:media_url_https] + ":orig"
+            media[:url] + ":orig"
           elsif media[:type].in?(["video", "animated_gif"])
-            variants = media.dig(:video_info, :variants)
+            variants = media.dig(:variants)
             videos = variants.select { |variant| variant[:content_type] == "video/mp4" }
-            video = videos.max_by { |v| v[:bitrate].to_i }
+            video = videos.max_by { |v| v[:bit_rate].to_i }
             video[:url]
           end
         end
@@ -58,7 +58,7 @@ class Source::Extractor
     end
 
     def intent_url
-      user_id = api_response.dig(:user, :id_str)
+      user_id = api_response.dig(:includes, :users, 0, :id)
       return nil if user_id.blank?
       "https://twitter.com/intent/user?user_id=#{user_id}"
     end
@@ -71,7 +71,7 @@ class Source::Extractor
       if tag_name_from_url.present?
         tag_name_from_url
       elsif api_response.present?
-        api_response.dig(:user, :screen_name)
+        api_response.dig(:includes, :users, 0, :username)
       else
         ""
       end
@@ -79,7 +79,7 @@ class Source::Extractor
 
     def artist_name
       if api_response.present?
-        api_response.dig(:user, :name)
+        api_response.dig(:includes, :users, 0, :name)
       else
         tag_name
       end
@@ -90,12 +90,12 @@ class Source::Extractor
     end
 
     def artist_commentary_desc
-      api_response[:full_text].to_s
+      api_response.dig(:data, :text).to_s
     end
 
     def tags
-      api_response.dig(:entities, :hashtags).to_a.map do |hashtag|
-        [hashtag[:text], "https://twitter.com/hashtag/#{hashtag[:text]}"]
+      api_response.dig(:data, :entities, :hashtags).to_a.map do |hashtag|
+        [hashtag[:tag], "https://twitter.com/hashtag/#{hashtag[:tag]}"]
       end
     end
 
@@ -112,10 +112,10 @@ class Source::Extractor
     def dtext_artist_commentary_desc
       return "" if artist_commentary_desc.blank?
 
-      url_replacements = api_response.dig(:entities, :urls).to_a.map do |obj|
+      url_replacements = api_response.dig(:data, :entities, :urls).to_a.map do |obj|
         [obj[:url], obj[:expanded_url]]
       end
-      url_replacements += api_response.dig(:extended_entities, :media).to_a.map do |obj|
+      url_replacements += api_response.dig(:includes, :media).to_a.map do |obj|
         [obj[:url], ""]
       end
       url_replacements = url_replacements.to_h

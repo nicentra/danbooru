@@ -39,7 +39,7 @@ class TwitterApiClient
   # end
 
   def status(id, cache: 1.minute)
-    response = client.cache(cache).get("https://api.twitter.com/2/tweets/#{id}?expansions=attachments.media_keys&media.fields=duration_ms,height,media_key,preview_image_url,public_metrics,type,url,width,alt_text")
+    response = client.cache(cache).get("https://api.twitter.com/2/tweets/#{id}?expansions=attachments.media_keys,author_id&media.fields=url,variants&tweet.fields=entities")
     response.parse.with_indifferent_access
   end
 
